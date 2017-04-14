@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from database_setup import Base, Restaurant, MenuItem
@@ -14,22 +14,22 @@ session = DBSession()
 
 @app.route('/')
 @app.route('/restaurants/<int:restaurant_id>/')
-
 def restaurantMenu(restaurant_id):
     restaurant = session.query(Restaurant).filter_by(id=restaurant_id).one()
     items = session.query(MenuItem).filter_by(restaurant_id=restaurant.id)
-    return render_template('menu.html', restaurant = restaurant, items =items)
+    return render_template('menu2.html', restaurant = restaurant, items =items)
 
 # Task 1: Create route for newMenuItem function here
 
 
-@app.route('/restaurant/<int:restaurant_id>/new/', methods=['GET', 'POST'])
+@app.route('/restaurants/<int:restaurant_id>/new/', methods=['GET', 'POST'])
 def newMenuItem(restaurant_id):
     if request.method == 'POST':
         newItem = MenuItem(
             name=request.form['name'], restaurant_id=restaurant_id, description = 'TBD', price ='$5.00')
         session.add(newItem)
         session.commit()
+        flash("new menu item created")
         return redirect(url_for('restaurantMenu', restaurant_id = restaurant_id))
     else:
         return render_template('newmenuitem.html', restaurant_id = restaurant_id)
@@ -46,6 +46,7 @@ def editMenuItem(restaurant_id, MenuId):
             editedItem.description = request.form['description']
         session.add(editedItem)
         session.commit()
+        flash("The Item has been changed")
         return redirect(url_for('restaurantMenu', restaurant_id=restaurant_id))
     else:
         # USE THE RENDER_TEMPLATE FUNCTION BELOW TO SEE THE VARIABLES YOU
@@ -55,11 +56,31 @@ def editMenuItem(restaurant_id, MenuId):
 
 # Task 3: Create a route for deleteMenuItem function here
 
-@app.route('/restaurants/<int:restaurant_id>/<int:MenuId>/deleteMenuItem/')
+@app.route('/restaurants/<int:restaurant_id>/<int:MenuId>/deleteMenuItem/', methods=['GET', 'POST'])
 def deleteMenuItem(restaurant_id, MenuId):
-    return "page to delete a menu item. Task 3 complete!"
+    itemToDelete = session.query(MenuItem).filter_by(id=MenuId).one()
+    if request.method == 'POST':
+        session.delete(itemToDelete)
+        session.commit()
+        flash("The Item Has Been Deleted")
+        return redirect(url_for('restaurantMenu', restaurant_id=restaurant_id))
+    else:
+        return render_template('deletemenuitem.html', restaurant_id=restaurant_id, item = itemToDelete)
+
+@app.route('/restaurants/<int:restaurant_id>/menu/JSON')
+def restaurantMenuJSON(restaurant_id):
+    restaurant = session.query(Restaurant).filter_by(id=restaurant_id).one()
+    items = session.query(MenuItem).filter_by(
+        restaurant_id=restaurant_id).all()
+    return jsonify(MenuItems=[i.serialize for i in items])
+
+@app.route('/restaurants/<int:restaurant_id>/menu/<int:menu_id>/JSON')
+def menuItemJSON(restaurant_id, menu_id):
+    menuItem = session.query(MenuItem).filter_by(id=menu_id).one()
+    return jsonify(MenuItem=menuItem.serialize)
 
 if __name__ == '__main__':
+    app.secret_key ="super_secret_key"
     app.debug = True
     app.run(host='0.0.0.0', port=5000)
 
